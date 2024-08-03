@@ -1,4 +1,26 @@
-﻿using HarmonyLib;
+#region License (GPL v2)
+/*
+    TinCanBoom! Add Explosive to TinCanAlarm
+    Copyright (c) 2024 RFC1920 <desolationoutpostpve@gmail.com>
+
+    This program is free software; you can redistribute it and/or
+    modify it under the terms of the GNU General Public License
+    as published by the Free Software Foundation; version 2
+    of the License only.
+
+    This program is distributed in the hope that it will be useful,
+    but WITHOUT ANY WARRANTY; without even the implied warranty of
+    MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+    GNU General Public License for more details.
+
+    You should have received a copy of the GNU General Public License
+    along with this program; if not, write to the Free Software
+    Foundation, Inc., 51 Franklin Street, Fifth Floor, Boston, MA  02110-1301, USA.
+
+    Optionally you can also view the license at <http://www.gnu.org/licenses/>.
+*/
+#endregion License (GPL v2)
+using HarmonyLib;
 using Oxide.Core.Plugins;
 using UnityEngine;
 //Reference: 0Harmony
@@ -6,20 +28,16 @@ using UnityEngine;
 namespace Oxide.Plugins
 {
     [Info("TinCanBoom", "RFC1920", "0.0.1")]
-    [Description("")]
+    [Description("Add explosives to TinCanAlarm")]
     internal class TinCanBoom : RustPlugin
     {
         private bool debug = true;
-        private const string expPrefab = "assets/prefabs/resource/explosives/explosives.item.prefab";
+
         private void OnEntitySpawned(TinCanAlarm alarm)
         {
             RFTimedExplosive exp = GameManager.server.CreateEntity("assets/prefabs/tools/c4/explosive.timed.deployed.prefab") as RFTimedExplosive;
             exp.enableSaving = false;
-            exp.CancelInvokeFixedTime(null);
             exp.flags = 0;
-            exp.timerAmountMin = float.PositiveInfinity;
-            exp.timerAmountMax = float.PositiveInfinity;
-            exp.triggers = alarm.triggers;
             exp.SetFuse(float.PositiveInfinity);
             exp.transform.localPosition = new Vector3(0f, 1f, 0f);
             exp.SetParent(alarm);
@@ -29,11 +47,6 @@ namespace Oxide.Plugins
             UnityEngine.Object.DestroyImmediate(exp.beepLoop);
             exp.UpdateNetworkGroup();
 
-            //BaseEntity exp = GameManager.server.CreateEntity(expPrefab, alarm.transform.position, alarm.transform.rotation, true);
-            //TimedExplosive te = exp as TimedExplosive;
-            //te.timerAmountMax = 0;
-            //te.triggers = alarm.triggers;
-            //exp.Spawn();
             SpawnRefresh(exp);
         }
 
@@ -52,10 +65,16 @@ namespace Oxide.Plugins
                 RFTimedExplosive te = __instance.gameObject.GetComponentInChildren<RFTimedExplosive>();
                 if (te != null)
                 {
-                    te.SetFuse(0);
-                    te.SetFlag(BaseEntity.Flags.On, true, false, false);
+                    Core.Interface.CallHook("OnTinCanAlarmTrigger", __instance, te);
                 }
             }
+        }
+
+        private void OnTinCanAlarmTrigger(TinCanAlarm entity, RFTimedExplosive te)
+        {
+            DoLog("OnTinCanAlarmTrigger works!");
+            te?.SetFuse(0);
+            te?.SetFlag(BaseEntity.Flags.On, true, false, false);
         }
 
         public void RemoveComps(BaseEntity obj)
