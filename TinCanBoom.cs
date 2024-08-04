@@ -31,7 +31,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("TinCanBoom", "RFC1920", "1.0.0")]
+    [Info("TinCanBoom", "RFC1920", "1.0.1")]
     [Description("Add explosives to TinCanAlarm")]
     internal class TinCanBoom : RustPlugin
     {
@@ -160,24 +160,26 @@ namespace Oxide.Plugins
             [HarmonyPrefix]
             static void Prefix(TinCanAlarm __instance)
             {
-                RFTimedExplosive te = __instance.gameObject.GetComponentInChildren<RFTimedExplosive>();
-                if (te != null)
-                {
-                    Interface.CallHook("OnTinCanAlarmTrigger", __instance, te);
-                }
+                Interface.CallHook("OnTinCanAlarmTrigger", __instance);
             }
         }
 
-        private void OnTinCanAlarmTrigger(TinCanAlarm entity, RFTimedExplosive te)
+        private void OnTinCanAlarmTrigger(TinCanAlarm alarm)
         {
-            te?.SetFuse(0);
-            te?.SetFlag(BaseEntity.Flags.On, true, false, false);
+            if (alarm == null) return;
+            RFTimedExplosive te = alarm.gameObject.GetComponentInChildren<RFTimedExplosive>();
+            if (te != null)
+            {
+                te._limitedNetworking = false;
+                te.SetFuse(configData.Options.fireDelay);
+                te.SetFlag(BaseEntity.Flags.On, true, false, false);
 
-            BasePlayer player = FindPlayerByID(entity.OwnerID);
-            DoLog($"Removing destroyed alarm from data for {player?.displayName}");
+                BasePlayer player = FindPlayerByID(alarm.OwnerID);
+                DoLog($"Removing destroyed alarm from data for {player?.displayName}");
 
-            playerAlarms[player.userID].RemoveAll(x => x.te == te.net.ID);
-            SaveData();
+                playerAlarms[player.userID].RemoveAll(x => x.te == te.net.ID);
+                SaveData();
+            }
         }
 
         public void RemoveComps(BaseEntity obj)
@@ -257,6 +259,7 @@ namespace Oxide.Plugins
                 {
                     RequirePermission = true,
                     startEnabled = false,
+                    fireDelay = 2f,
                     debug = false
                 },
                 Version = Version
@@ -279,8 +282,9 @@ namespace Oxide.Plugins
         public class Options
         {
             public bool RequirePermission;
-            public bool debug;
             public bool startEnabled;
+            public float fireDelay;
+            public bool debug;
         }
         #endregion
     }
