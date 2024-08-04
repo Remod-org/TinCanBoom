@@ -22,19 +22,31 @@
 #endregion License (GPL v2)
 using HarmonyLib;
 using Oxide.Core;
+using Oxide.Core.Libraries.Covalence;
 using Oxide.Core.Plugins;
+using Oxide.Ext.Chaos;
 using System.Collections.Generic;
 using UnityEngine;
 //Reference: 0Harmony
 
 namespace Oxide.Plugins
 {
-    [Info("TinCanBoom", "RFC1920", "0.0.3")]
+    [Info("TinCanBoom", "RFC1920", "1.0.0")]
     [Description("Add explosives to TinCanAlarm")]
     internal class TinCanBoom : RustPlugin
     {
-        private bool debug = true;
+        ConfigData configData;
         private Dictionary<ulong, List<TinCanEnhanced>> playerAlarms = new Dictionary<ulong, List<TinCanEnhanced>>();
+        public const string permUse = "tincanboom.use";
+
+        private readonly List<string> orDefault = new List<string>();
+
+        #region Message
+        private string Lang(string key, string id = null, params object[] args) => string.Format(lang.GetMessage(key, this, id), args);
+        private void Message(IPlayer player, string key, params object[] args) => player.Message(Lang(key, player.Id, args));
+        private void LMessage(IPlayer player, string key, params object[] args) => player.Reply(Lang(key, player.Id, args));
+        #endregion
+
         public class TinCanEnhanced
         {
             public string location;
@@ -42,8 +54,49 @@ namespace Oxide.Plugins
             public NetworkableId te;
         }
 
+        protected override void LoadDefaultMessages()
+        {
+            lang.RegisterMessages(new Dictionary<string, string>()
+            {
+                { "off", "OFF" },
+                { "on", "ON" },
+                { "notauthorized", "You don't have permission to do that !!" },
+                { "enabled", "TinCanBoom enabled" },
+                { "disabled", "TinCanBoom disabled" }
+            }, this);
+        }
+
+        [Command("ente"), Permission(permUse)]
+        private void EnableDisable(IPlayer iplayer, string command, string[] args)
+        {
+            if (!iplayer.HasPermission(permUse) && configData.Options.RequirePermission) { Message(iplayer, "notauthorized"); return; }
+
+            bool en = configData.Options.startEnabled;
+            if (orDefault.Contains(iplayer.Id))
+            {
+                orDefault.Remove(iplayer.Id);
+            }
+            else
+            {
+                orDefault.Add(iplayer.Id);
+                en = !en;
+            }
+            switch (en)
+            {
+                case true:
+                    Message(iplayer, "enabled");
+                    break;
+                case false:
+                    Message(iplayer, "disabled");
+                    break;
+            }
+        }
+
         private void OnServerInitialized()
         {
+            LoadConfigVariables();
+            AddCovalenceCommand("ente", "EnableDisable");
+            permission.RegisterPermission(permUse, this);
             LoadData();
         }
 
@@ -51,6 +104,19 @@ namespace Oxide.Plugins
         {
             BasePlayer player = FindPlayerByID(alarm.OwnerID);
             if (player == null) return;
+            if (configData.Options.RequirePermission && !player.HasPermission(permUse)) return;
+
+            if (configData.Options.startEnabled && orDefault.Contains(player.UserIDString))
+            {
+                DoLog("Plugin enabled by default, but player-disabled");
+                return;
+            }
+            else if (!configData.Options.startEnabled && !orDefault.Contains(player.UserIDString))
+            {
+                DoLog("Plugin disabled by default, and not player-enabled");
+                return;
+            }
+
             RFTimedExplosive exp = GameManager.server.CreateEntity("assets/prefabs/tools/c4/explosive.timed.deployed.prefab") as RFTimedExplosive;
             exp.enableSaving = false;
             exp.transform.localPosition = new Vector3(0f, 1f, 0f);
@@ -84,7 +150,7 @@ namespace Oxide.Plugins
 
         private void DoLog(string message)
         {
-            if (debug) Puts(message);
+            if (configData.Options.debug) Puts(message);
         }
 
         [AutoPatch]
@@ -172,5 +238,50 @@ namespace Oxide.Plugins
             Interface.Oxide.DataFileSystem.WriteObject(Name + "/playerAlarms", playerAlarms);
         }
         #endregion Data
+
+        #region config
+        private void LoadConfigVariables()
+        {
+            configData = Config.ReadObject<ConfigData>();
+
+            configData.Version = Version;
+            SaveConfig(configData);
+        }
+
+        protected override void LoadDefaultConfig()
+        {
+            Puts("Creating new config file.");
+            ConfigData config = new ConfigData
+            {
+                Options = new Options()
+                {
+                    RequirePermission = true,
+                    startEnabled = false,
+                    debug = false
+                },
+                Version = Version
+            };
+
+            SaveConfig(config);
+        }
+
+        private void SaveConfig(ConfigData config)
+        {
+            Config.WriteObject(config, true);
+        }
+
+        private class ConfigData
+        {
+            public Options Options;
+            public VersionNumber Version;
+        }
+
+        public class Options
+        {
+            public bool RequirePermission;
+            public bool debug;
+            public bool startEnabled;
+        }
+        #endregion
     }
 }
