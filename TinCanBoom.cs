@@ -21,20 +21,36 @@
 */
 #endregion License (GPL v2)
 using HarmonyLib;
+using Oxide.Core;
 using Oxide.Core.Plugins;
+using System.Collections.Generic;
 using UnityEngine;
 //Reference: 0Harmony
 
 namespace Oxide.Plugins
 {
-    [Info("TinCanBoom", "RFC1920", "0.0.2")]
+    [Info("TinCanBoom", "RFC1920", "0.0.3")]
     [Description("Add explosives to TinCanAlarm")]
     internal class TinCanBoom : RustPlugin
     {
         private bool debug = true;
+        private Dictionary<ulong, List<TinCanEnhanced>> playerAlarms = new Dictionary<ulong, List<TinCanEnhanced>>();
+        public class TinCanEnhanced
+        {
+            public string location;
+            public NetworkableId alarm;
+            public NetworkableId te;
+        }
+
+        private void OnServerInitialized()
+        {
+            LoadData();
+        }
 
         private void OnEntitySpawned(TinCanAlarm alarm)
         {
+            BasePlayer player = FindPlayerByID(alarm.OwnerID);
+            if (player == null) return;
             RFTimedExplosive exp = GameManager.server.CreateEntity("assets/prefabs/tools/c4/explosive.timed.deployed.prefab") as RFTimedExplosive;
             exp.enableSaving = false;
             exp.transform.localPosition = new Vector3(0f, 1f, 0f);
@@ -48,13 +64,22 @@ namespace Oxide.Plugins
             exp.Spawn();
             exp.stickEffect = null;
             UnityEngine.Object.DestroyImmediate(exp.beepLoop);
-            NextTick(() =>
-            {
-                exp.UpdateNetworkGroup();
-                exp.SendNetworkUpdateImmediate();
-            });
+            exp.beepLoop = null;
+            exp._limitedNetworking = true;
+            exp.SendNetworkUpdateImmediate();
 
             SpawnRefresh(exp);
+            if (!playerAlarms.ContainsKey(player.userID))
+            {
+                playerAlarms.Add(player.userID, new List<TinCanEnhanced>());
+            }
+            playerAlarms[player.userID].Add(new TinCanEnhanced()
+            {
+                location = alarm.transform.position.ToString(),
+                alarm = alarm.net.ID,
+                te = exp.net.ID
+            });
+            SaveData();
         }
 
         private void DoLog(string message)
@@ -72,16 +97,21 @@ namespace Oxide.Plugins
                 RFTimedExplosive te = __instance.gameObject.GetComponentInChildren<RFTimedExplosive>();
                 if (te != null)
                 {
-                    Core.Interface.CallHook("OnTinCanAlarmTrigger", __instance, te);
+                    Interface.CallHook("OnTinCanAlarmTrigger", __instance, te);
                 }
             }
         }
 
         private void OnTinCanAlarmTrigger(TinCanAlarm entity, RFTimedExplosive te)
         {
-            DoLog("OnTinCanAlarmTrigger works!");
             te?.SetFuse(0);
             te?.SetFlag(BaseEntity.Flags.On, true, false, false);
+
+            BasePlayer player = FindPlayerByID(entity.OwnerID);
+            DoLog($"Removing destroyed alarm from data for {player?.displayName}");
+
+            playerAlarms[player.userID].RemoveAll(x => x.te == te.net.ID);
+            SaveData();
         }
 
         public void RemoveComps(BaseEntity obj)
@@ -93,6 +123,28 @@ namespace Oxide.Plugins
                 DoLog($"Destroying MeshCollider for {obj.ShortPrefabName}");
                 UnityEngine.Object.DestroyImmediate(mesh);
             }
+        }
+
+        private BasePlayer FindPlayerByID(ulong userid, bool includeSleepers = true)
+        {
+            foreach (BasePlayer activePlayer in BasePlayer.activePlayerList)
+            {
+                if (activePlayer.userID == userid)
+                {
+                    return activePlayer;
+                }
+            }
+            if (includeSleepers)
+            {
+                foreach (BasePlayer sleepingPlayer in BasePlayer.sleepingPlayerList)
+                {
+                    if (sleepingPlayer.userID == userid)
+                    {
+                        return sleepingPlayer;
+                    }
+                }
+            }
+            return null;
         }
 
         private void SpawnRefresh(BaseEntity entity)
@@ -108,5 +160,17 @@ namespace Oxide.Plugins
                 hasmount.isMobile = true;
             }
         }
+
+        #region Data
+        private void LoadData()
+        {
+            playerAlarms = Interface.Oxide.DataFileSystem.ReadObject<Dictionary<ulong, List<TinCanEnhanced>>>(Name + "/playerAlarms");
+        }
+
+        private void SaveData()
+        {
+            Interface.Oxide.DataFileSystem.WriteObject(Name + "/playerAlarms", playerAlarms);
+        }
+        #endregion Data
     }
 }
