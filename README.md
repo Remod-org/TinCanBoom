@@ -16,7 +16,7 @@ The hook itself can be used for additional signaling, etc., and we may integrate
 
 ### Permissions
 
-   - `tincanboom.use` -- If configuration has RequirePermission set to true, this is the required permission.
+  - `tincanboom.use` -- If configuration has RequirePermission set to true, this is the required permission.
 
 ### Configuration
 ```json
@@ -37,7 +37,7 @@ The hook itself can be used for additional signaling, etc., and we may integrate
 
   - `RequirePermission` -- If true, players must have the tincanboom.use permission.
   - `startEnabled` -- Set default after load for whether a standard TinCanAlarm or a TinCanBoom will be deployed.
-  - `fireDelay` -- 0 == immediately upon trigger.  Can set higher to delay the firing of the explosive.
+  - `fireDelay` -- Delay firing of the explosive for X seconds.  0 means immediately upon trigger.  Can set higher to delay the firing of the explosive.
 
 ### Commands
 
