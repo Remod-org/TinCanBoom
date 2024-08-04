@@ -12,7 +12,7 @@ This Plugin uses harmony to add a new hook, OnTinCanAlarmTrigger.
 
 The plugin includes an example of this hook, which is used to enable and fire the explosive.
 
-The hook itself can be used for additional signaling, etc., and we may integrate that as well.
+The hook itself can be used for additional signaling, etc.
 
 ### Permissions
 
@@ -24,19 +24,21 @@ The hook itself can be used for additional signaling, etc., and we may integrate
   "Options": {
     "RequirePermission": true,
     "startEnabled": false,
+    "NotifyOwner": false,
     "fireDelay": 0.0,
     "debug": false
   },
   "Version": {
     "Major": 1,
     "Minor": 0,
-    "Patch": 1
+    "Patch": 2
   }
 }
 ```
 
   - `RequirePermission` -- If true, players must have the tincanboom.use permission.
   - `startEnabled` -- Set default after load for whether a standard TinCanAlarm or a TinCanBoom will be deployed.
+  - `NotifyOwner` -- Owner will be notified on trigger if true.
   - `fireDelay` -- Delay firing of the explosive for X seconds.  0 means immediately upon trigger.  Can set higher to delay the firing of the explosive.
 
 ### Commands

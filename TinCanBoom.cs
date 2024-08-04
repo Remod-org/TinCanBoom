@@ -26,15 +26,19 @@ using Oxide.Core.Libraries.Covalence;
 using Oxide.Core.Plugins;
 using Oxide.Ext.Chaos;
 using System.Collections.Generic;
+using System.Reflection;
 using UnityEngine;
 //Reference: 0Harmony
 
 namespace Oxide.Plugins
 {
-    [Info("TinCanBoom", "RFC1920", "1.0.1")]
+    [Info("TinCanBoom", "RFC1920", "1.0.2")]
     [Description("Add explosives to TinCanAlarm")]
     internal class TinCanBoom : RustPlugin
     {
+        [PluginReference]
+        private readonly Plugin Friends, Clans, GridAPI;
+
         ConfigData configData;
         private Dictionary<ulong, List<TinCanEnhanced>> playerAlarms = new Dictionary<ulong, List<TinCanEnhanced>>();
         public const string permUse = "tincanboom.use";
@@ -61,6 +65,7 @@ namespace Oxide.Plugins
                 { "off", "OFF" },
                 { "on", "ON" },
                 { "notauthorized", "You don't have permission to do that !!" },
+                { "alarmtripped", "TinCanBoom tripped by {1} at {0}" },
                 { "enabled", "TinCanBoom enabled" },
                 { "disabled", "TinCanBoom disabled" }
             }, this);
@@ -174,7 +179,20 @@ namespace Oxide.Plugins
                 te.SetFuse(configData.Options.fireDelay);
                 te.SetFlag(BaseEntity.Flags.On, true, false, false);
 
+                FieldInfo lastTriggeredBy = typeof(TinCanAlarm).GetField("lastTriggerEntity", (BindingFlags.Instance | BindingFlags.NonPublic | BindingFlags.Public));
+                object victimEnt = lastTriggeredBy.GetValue(alarm);
+                string victim = "unknown";
+                if (victimEnt is BasePlayer)
+                {
+                    victim = (victimEnt as BasePlayer).displayName;
+                }
+
                 BasePlayer player = FindPlayerByID(alarm.OwnerID);
+                if (configData.Options.NotifyOwner)
+                {
+                    string pos = PositionToGrid(alarm.transform.position);
+                    SendReply(player, Lang("alarmtripped", null, pos, victim));
+                }
                 DoLog($"Removing destroyed alarm from data for {player?.displayName}");
 
                 playerAlarms[player.userID].RemoveAll(x => x.te == te.net.ID);
@@ -229,6 +247,24 @@ namespace Oxide.Plugins
             }
         }
 
+        public string PositionToGrid(Vector3 position)
+        {
+            if (GridAPI != null)
+            {
+                string[] g = (string[])GridAPI.CallHook("GetGrid", position);
+                return string.Concat(g);
+            }
+            else
+            {
+                // From GrTeleport for display only
+                Vector2 r = new Vector2((World.Size / 2) + position.x, (World.Size / 2) + position.z);
+                float x = Mathf.Floor(r.x / 146.3f) % 26;
+                float z = Mathf.Floor(World.Size / 146.3f) - Mathf.Floor(r.y / 146.3f);
+
+                return $"{(char)('A' + x)}{z - 1}";
+            }
+        }
+
         #region Data
         private void LoadData()
         {
@@ -259,6 +295,7 @@ namespace Oxide.Plugins
                 {
                     RequirePermission = true,
                     startEnabled = false,
+                    NotifyOwner = false,
                     fireDelay = 2f,
                     debug = false
                 },
@@ -283,6 +320,7 @@ namespace Oxide.Plugins
         {
             public bool RequirePermission;
             public bool startEnabled;
+            public bool NotifyOwner;
             public float fireDelay;
             public bool debug;
         }
