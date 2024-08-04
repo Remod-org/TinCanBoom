@@ -27,7 +27,7 @@ using UnityEngine;
 
 namespace Oxide.Plugins
 {
-    [Info("TinCanBoom", "RFC1920", "0.0.1")]
+    [Info("TinCanBoom", "RFC1920", "0.0.2")]
     [Description("Add explosives to TinCanAlarm")]
     internal class TinCanBoom : RustPlugin
     {
@@ -37,15 +37,22 @@ namespace Oxide.Plugins
         {
             RFTimedExplosive exp = GameManager.server.CreateEntity("assets/prefabs/tools/c4/explosive.timed.deployed.prefab") as RFTimedExplosive;
             exp.enableSaving = false;
+            exp.transform.localPosition = new Vector3(0f, 1f, 0f);
             exp.flags = 0;
             exp.SetFuse(float.PositiveInfinity);
-            exp.transform.localPosition = new Vector3(0f, 1f, 0f);
+            exp.timerAmountMin = float.PositiveInfinity;
+            exp.timerAmountMax = float.PositiveInfinity;
+
             exp.SetParent(alarm);
             RemoveComps(exp);
             exp.Spawn();
             exp.stickEffect = null;
             UnityEngine.Object.DestroyImmediate(exp.beepLoop);
-            exp.UpdateNetworkGroup();
+            NextTick(() =>
+            {
+                exp.UpdateNetworkGroup();
+                exp.SendNetworkUpdateImmediate();
+            });
 
             SpawnRefresh(exp);
         }
