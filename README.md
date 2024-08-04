@@ -24,7 +24,7 @@ The hook itself can be used for additional signaling, etc., and we may integrate
   "Options": {
     "RequirePermission": true,
     "startEnabled": false,
-	"fireDelay": 0.0,
+    "fireDelay": 0.0,
     "debug": false
   },
   "Version": {
