@@ -2,6 +2,8 @@
 
 Adds (timed) explosive to trigger for TinCanAlarm.  Can be switched on or off for each deployment using the /ente command.
 
+The explosive will be invisible and silent.  On triggering, the TinCanAlarm will also be destroyed.
+
 ### Permissions
 
    - `tincanboom.use` -- If configuration has RequirePermission set to true, this is the required permission.
