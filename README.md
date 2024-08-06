@@ -25,13 +25,14 @@ The hook itself can be used for additional signaling, etc.
     "RequirePermission": true,
     "startEnabled": false,
     "NotifyOwner": false,
+    "CanDeployAtMonuments": false,
     "fireDelay": 0.0,
     "debug": false
   },
   "Version": {
     "Major": 1,
     "Minor": 0,
-    "Patch": 2
+    "Patch": 3
   }
 }
 ```
@@ -39,6 +40,7 @@ The hook itself can be used for additional signaling, etc.
   - `RequirePermission` -- If true, players must have the tincanboom.use permission.
   - `startEnabled` -- Set default after load for whether a standard TinCanAlarm or a TinCanBoom will be deployed.
   - `NotifyOwner` -- Owner will be notified on trigger if true.
+  - `CanDeployAtMonuments` -- If true, the player can deploy at monuments.  If false (default), only the base alarm will be deployed, as is Rust default.
   - `fireDelay` -- Delay firing of the explosive for X seconds.  0 means immediately upon trigger.  Can set higher to delay the firing of the explosive.
 
 ### Commands

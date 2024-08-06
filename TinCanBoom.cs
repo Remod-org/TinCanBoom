@@ -27,12 +27,13 @@ using Oxide.Core.Plugins;
 using Oxide.Ext.Chaos;
 using System.Collections.Generic;
 using System.Reflection;
+using System.Text.RegularExpressions;
 using UnityEngine;
 //Reference: 0Harmony
 
 namespace Oxide.Plugins
 {
-    [Info("TinCanBoom", "RFC1920", "1.0.2")]
+    [Info("TinCanBoom", "RFC1920", "1.0.3")]
     [Description("Add explosives to TinCanAlarm")]
     internal class TinCanBoom : RustPlugin
     {
@@ -41,6 +42,8 @@ namespace Oxide.Plugins
 
         ConfigData configData;
         private Dictionary<ulong, List<TinCanEnhanced>> playerAlarms = new Dictionary<ulong, List<TinCanEnhanced>>();
+        public SortedDictionary<string, Vector3> monPos = new SortedDictionary<string, Vector3>();
+        public SortedDictionary<string, Vector3> monSize = new SortedDictionary<string, Vector3>();
         public const string permUse = "tincanboom.use";
 
         private readonly List<string> orDefault = new List<string>();
@@ -103,6 +106,15 @@ namespace Oxide.Plugins
             AddCovalenceCommand("ente", "EnableDisable");
             permission.RegisterPermission(permUse, this);
             LoadData();
+            FindMonuments();
+        }
+
+        private object CanDeployItem(BasePlayer player, Deployer deployer, NetworkableId entityId)
+        {
+            TinCanAlarm alarm = BaseNetworkable.serverEntities.Find(entityId) as TinCanAlarm;
+            if (alarm == null) return null;
+
+            return null;
         }
 
         private void OnEntitySpawned(TinCanAlarm alarm)
@@ -119,6 +131,11 @@ namespace Oxide.Plugins
             else if (!configData.Options.startEnabled && !orDefault.Contains(player.UserIDString))
             {
                 DoLog("Plugin disabled by default, and not player-enabled");
+                return;
+            }
+
+            if (NearMonument(player.transform.position))
+            {
                 return;
             }
 
@@ -247,6 +264,28 @@ namespace Oxide.Plugins
             }
         }
 
+        private bool NearMonument(Vector3 pos)
+        {
+            if (configData.Options.CanDeployAtMonuments) return false;
+
+            foreach (KeyValuePair<string, Vector3> entry in monPos)
+            {
+                string monname = entry.Key;
+                Vector3 monvector = entry.Value;
+                float realDistance = monSize[monname].z;
+                monvector.y = pos.y;
+                float dist = Vector3.Distance(pos, monvector);
+
+                DoLog($"Checking {monname} dist: {dist}, realDistance: {realDistance}");
+                if (dist < realDistance)
+                {
+                    DoLog($"Player in range of {monname}");
+                    return true;
+                }
+            }
+            return false;
+        }
+
         public string PositionToGrid(Vector3 position)
         {
             if (GridAPI != null)
@@ -262,6 +301,64 @@ namespace Oxide.Plugins
                 float z = Mathf.Floor(World.Size / 146.3f) - Mathf.Floor(r.y / 146.3f);
 
                 return $"{(char)('A' + x)}{z - 1}";
+            }
+        }
+
+        private void FindMonuments()
+        {
+            foreach (MonumentInfo monument in UnityEngine.Object.FindObjectsOfType<MonumentInfo>())
+            {
+                if (monument.name.Contains("power_sub") || monument.name.Contains("derwater")) continue;
+
+                float realWidth = 0f;
+                string name;
+                if (monument.name == "OilrigAI")
+                {
+                    name = "Small Oilrig";
+                    realWidth = 100f;
+                }
+                else if (monument.name == "OilrigAI2")
+                {
+                    name = "Large Oilrig";
+                    realWidth = 200f;
+                }
+                else if (monument.name == "assets/bundled/prefabs/autospawn/monument/medium/radtown_small_3.prefab")
+                {
+                    name = "Sewer Branch";
+                    realWidth = 100;
+                }
+                else
+                {
+                    name = Regex.Match(monument.name, @"\w{6}\/(.+\/)(.+)\.(.+)").Groups[2].Value.Replace("_", " ").Replace(" 1", "").Titleize();// + " 0";
+                }
+                if (name.Length == 0) continue;
+                if (monPos.ContainsKey(name))
+                {
+                    if (monPos[name] == monument.transform.position) continue;
+                    string newname = name.Remove(name.Length - 1, 1) + "1";
+                    if (monPos.ContainsKey(newname))
+                    {
+                        newname = name.Remove(name.Length - 1, 1) + "2";
+                    }
+                    if (monPos.ContainsKey(newname))
+                    {
+                        continue;
+                    }
+                    name = newname;
+                }
+
+                Vector3 extents = monument.Bounds.extents;
+                if (realWidth > 0f)
+                {
+                    extents.z = realWidth;
+                }
+                if (extents.z < 1)
+                {
+                    extents.z = 50f;
+                }
+                monPos.Add(name.Trim(), monument.transform.position);
+                monSize.Add(name.Trim(), extents);
+                Puts($"Found monument {name} at {monument.transform.position.ToString()}");
             }
         }
 
@@ -321,6 +418,7 @@ namespace Oxide.Plugins
             public bool RequirePermission;
             public bool startEnabled;
             public bool NotifyOwner;
+            public bool CanDeployAtMonuments;
             public float fireDelay;
             public bool debug;
         }
